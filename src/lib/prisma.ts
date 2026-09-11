@@ -8,6 +8,7 @@
 // ============================================================
 
 import { DatabaseSync } from "node:sqlite";
+import bcrypt from "bcryptjs";
 import { mkdirSync } from "fs";
 import { dirname, isAbsolute, join } from "path";
 
@@ -21,6 +22,28 @@ function resolveDbPath(): string {
 
 const globalForDb = globalThis as unknown as { __phoneshopDb?: DatabaseSync };
 
+// Production bootstrap: if BOOTSTRAP_ADMIN_EMAIL/BOOTSTRAP_ADMIN_PASSWORD are
+// set and the database has no users yet, create the initial admin account.
+// Idempotent — a no-op once any user exists (or when the vars are unset).
+function maybeBootstrapAdmin(db: DatabaseSync) {
+  const email = process.env.BOOTSTRAP_ADMIN_EMAIL?.toLowerCase().trim();
+  const password = process.env.BOOTSTRAP_ADMIN_PASSWORD;
+  if (!email || !password) return;
+  try {
+    const row = db.prepare("SELECT COUNT(*) AS n FROM User").get() as { n: number };
+    if (row.n > 0) return;
+    const id = "c" + Math.random().toString(36).slice(2) + Date.now().toString(36);
+    const now = new Date().toISOString();
+    db.prepare(
+      `INSERT INTO User (id, name, email, password, role, active, language, createdAt, updatedAt)
+       VALUES (?, ?, ?, ?, 'ADMIN', 1, 'ar', ?, ?)`
+    ).run(id, "Admin", email, bcrypt.hashSync(password, 10), now, now);
+    console.log(`[bootstrap] admin user created: ${email}`);
+  } catch (e) {
+    console.error("[bootstrap] failed:", e);
+  }
+}
+
 function getDb(): DatabaseSync {
   if (!globalForDb.__phoneshopDb) {
     const file = resolveDbPath();
@@ -29,6 +52,7 @@ function getDb(): DatabaseSync {
     db.exec("PRAGMA journal_mode = WAL");
     db.exec("PRAGMA foreign_keys = ON");
     migrate(db);
+    maybeBootstrapAdmin(db);
     globalForDb.__phoneshopDb = db;
   }
   return globalForDb.__phoneshopDb;

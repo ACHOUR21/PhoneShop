@@ -8,6 +8,12 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import { prisma } from "./prisma";
 import { verifyTOTP } from "./totp";
 
+// Host-provided public URL fallback (Render sets RENDER_EXTERNAL_URL;
+// Fly users should set NEXTAUTH_URL as a secret).
+if (!process.env.NEXTAUTH_URL && process.env.RENDER_EXTERNAL_URL) {
+  process.env.NEXTAUTH_URL = process.env.RENDER_EXTERNAL_URL;
+}
+
 export const authOptions: NextAuthOptions = {
   session: { strategy: "jwt", maxAge: 60 * 60 * 12 },
   pages: {
