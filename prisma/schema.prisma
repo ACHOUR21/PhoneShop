@@ -1,0 +1,210 @@
+// ============================================================
+// PhoneShop Pro - Prisma schema (SQLite for zero-setup dev;
+// switch provider to `postgresql` + a postgres DATABASE_URL for prod)
+// ============================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id               String    @id @default(cuid())
+  name             String
+  email            String    @unique
+  password         String
+  role             String    @default("CASHIER") // ADMIN | MANAGER | TECHNICIAN | CASHIER | VIEWER
+  phone            String?
+  avatar           String?
+  active           Boolean   @default(true)
+  twoFactorEnabled Boolean   @default(false)
+  twoFactorSecret  String?
+  language         String    @default("ar")
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  assignedRepairs  Repair[]  @relation("AssignedRepairs")
+  sales            Sale[]    @relation("CashierSales")
+  expenses         Expense[] @relation("CreatedExpenses")
+  sessions         Session[]
+  notifications    Notification[]
+  statusChanges    RepairStatusHistory[] @relation("ChangedBy")
+}
+
+model Session {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userAgent  String?
+  ip         String?
+  createdAt  DateTime @default(now())
+  lastActive DateTime @default(now())
+  revoked    Boolean  @default(false)
+}
+
+model Customer {
+  id        String   @id @default(cuid())
+  name      String
+  phone     String   @unique
+  email     String?
+  address   String?
+  city      String?
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  repairs   Repair[]
+  sales     Sale[]
+}
+
+model Repair {
+  id            String    @id @default(cuid())
+  ticketNumber  String    @unique
+  customerId    String
+  customer      Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  deviceType    String    @default("phone") // phone | tablet | laptop | watch | accessory | other
+  brand         String    @default("")
+  model         String    @default("")
+  serial        String?
+  issue         String
+  diagnosis     String?
+  status        String    @default("RECEIVED") // RECEIVED|DIAGNOSED|IN_REPAIR|WAITING_PARTS|READY|DELIVERED|CANCELLED
+  priority      String    @default("MEDIUM")   // LOW|MEDIUM|HIGH|URGENT
+  assignedToId  String?
+  assignedTo    User?     @relation("AssignedRepairs", fields: [assignedToId], references: [id])
+  estimatedCost Float     @default(0)
+  finalCost     Float     @default(0)
+  deposit       Float     @default(0)
+  dueDate       DateTime?
+  returnedAt    DateTime?
+  notes         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  history       RepairStatusHistory[]
+}
+
+model RepairStatusHistory {
+  id          String   @id @default(cuid())
+  repairId    String
+  repair      Repair   @relation(fields: [repairId], references: [id], onDelete: Cascade)
+  fromStatus  String?
+  toStatus    String
+  changedById String?
+  changedBy   User?    @relation("ChangedBy", fields: [changedById], references: [id])
+  note        String?
+  createdAt   DateTime @default(now())
+}
+
+model Product {
+  id          String   @id @default(cuid())
+  sku         String   @unique
+  name        String
+  category    String   @default("general")
+  brand       String?
+  description String?
+  costPrice   Float    @default(0)
+  sellPrice   Float    @default(0)
+  quantity    Int      @default(0)
+  minQuantity Int      @default(5)
+  image       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  saleItems     SaleItem[]
+  purchaseItems PurchaseItem[]
+}
+
+model Sale {
+  id            String    @id @default(cuid())
+  invoiceNumber String    @unique
+  customerId    String?
+  customer      Customer? @relation(fields: [customerId], references: [id])
+  subtotal      Float     @default(0)
+  discount      Float     @default(0)
+  tax           Float     @default(0)
+  total         Float     @default(0)
+  paymentMethod String    @default("cash") // cash | card | transfer
+  amountPaid    Float     @default(0)
+  status        String    @default("COMPLETED") // COMPLETED | PENDING | CANCELLED | REFUNDED
+  cashierId     String?
+  cashier       User?     @relation("CashierSales", fields: [cashierId], references: [id])
+  notes         String?
+  createdAt     DateTime  @default(now())
+
+  items         SaleItem[]
+}
+
+model SaleItem {
+  id        String   @id @default(cuid())
+  saleId    String
+  sale      Sale     @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  productId String?
+  product   Product? @relation(fields: [productId], references: [id])
+  name      String
+  quantity  Int      @default(1)
+  unitPrice Float    @default(0)
+  total     Float    @default(0)
+}
+
+model PurchaseOrder {
+  id           String    @id @default(cuid())
+  poNumber     String    @unique
+  supplier     String
+  status       String    @default("DRAFT") // DRAFT|ORDERED|PARTIAL|RECEIVED|CANCELLED
+  expectedDate DateTime?
+  receivedDate DateTime?
+  subtotal     Float     @default(0)
+  notes        String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  items        PurchaseItem[]
+}
+
+model PurchaseItem {
+  id        String         @id @default(cuid())
+  poId      String
+  po        PurchaseOrder  @relation(fields: [poId], references: [id], onDelete: Cascade)
+  productId String?
+  product   Product?       @relation(fields: [productId], references: [id])
+  name      String
+  quantity  Int            @default(1)
+  unitCost  Float          @default(0)
+  total     Float          @default(0)
+  received  Int            @default(0)
+}
+
+model Expense {
+  id        String   @id @default(cuid())
+  title     String
+  category  String   @default("general") // rent|salary|utilities|supplies|marketing|maintenance|general
+  amount    Float    @default(0)
+  date      DateTime @default(now())
+  paidBy    String?
+  notes     String?
+  createdById String?
+  createdBy User?    @relation("CreatedExpenses", fields: [createdById], references: [id])
+  createdAt DateTime @default(now())
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  message   String
+  type      String   @default("info") // info | success | warning | alert | repair | sale | stock
+  read      Boolean  @default(false)
+  link      String?
+  createdAt DateTime @default(now())
+}
+
+model Setting {
+  key   String @id
+  value String
+}

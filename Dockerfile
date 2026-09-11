@@ -1,47 +1,46 @@
 # ============================================================
 # PhoneShop Pro - Production Dockerfile
-# Multi-stage build for Next.js 14 + Bun + PostgreSQL
+# Multi-stage build: Node 22 + Next.js standalone + SQLite
 # ============================================================
 
-FROM oven/bun:1 AS base
+FROM node:22-alpine AS base
 WORKDIR /app
+RUN apk add --no-cache openssl libc6-compat
 
 # Install dependencies
 FROM base AS deps
-COPY package.json bun.lock* ./
-RUN bun install --frozen-lockfile --production=false
+COPY package.json package-lock.json ./
+RUN npm ci --no-audit --no-fund
 
-# Generate Prisma client & run migrations
+# Generate Prisma client
 FROM base AS prisma
 COPY --from=deps /app/node_modules ./node_modules
 COPY prisma ./prisma
-RUN bunx prisma generate
-ARG DATABASE_URL
-ENV DATABASE_URL=${DATABASE_URL}
-RUN if [ -n "$DATABASE_URL" ]; then bunx prisma migrate deploy; else echo "Skipping migrations (no DATABASE_URL)"; fi
+COPY package.json ./
+RUN npx prisma generate
 
 # Build the application
 FROM base AS builder
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=prisma /app/node_modules/.prisma ./node_modules/.prisma
 COPY . .
-RUN bunx prisma generate
-RUN bun run build
+ENV NEXT_TELEMETRY_DISABLED=1
+RUN npx prisma generate && npm run build
 
 # Production image
 FROM base AS runner
 ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
 
-# Create non-root user
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs
 
-# Copy built assets
-COPY --from=builder /app/.next/standalone ./.next/standalone
+COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/prisma ./prisma
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+
+RUN mkdir -p /app/data && chown nextjs:nodejs /app/data
 
 USER nextjs
 EXPOSE 3000
@@ -51,4 +50,4 @@ ENV HOSTNAME="0.0.0.0"
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://localhost:3000/api/auth/session || exit 1
 
-CMD ["bun", "run", ".next/standalone/server.js"]
+CMD ["node", "server.js"]

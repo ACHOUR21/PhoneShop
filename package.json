@@ -3,14 +3,15 @@
   "version": "0.2.1",
   "private": true,
   "scripts": {
-    "dev": "next dev -p 3000 2>&1 | tee dev.log",
+    "dev": "next dev -H 0.0.0.0 -p 3000",
+    "test": "vitest run",
     "build": "next build && cp -r .next/static .next/standalone/.next/ && cp -r public .next/standalone/",
     "start": "NODE_ENV=production bun .next/standalone/server.js 2>&1 | tee server.log",
     "lint": "eslint .",
-    "db:push": "prisma db push --accept-data-loss",
-    "db:generate": "prisma generate",
-    "db:migrate": "prisma migrate dev",
-    "db:reset": "prisma migrate reset",
+    "db:push": "echo 'node:sqlite auto-migrates on startup (see src/lib/prisma.ts)'",
+    "db:generate": "echo 'no codegen needed (node:sqlite data layer)'",
+    "db:migrate": "echo 'node:sqlite auto-migrates on startup (see src/lib/prisma.ts)'",
+    "db:reset": "rm -f dev.db dev.db-wal dev.db-shm prisma/dev.db* && echo 'local sqlite db removed'",
     "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
