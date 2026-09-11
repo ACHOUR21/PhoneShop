@@ -1,6 +1,7 @@
 # ============================================================
-# PhoneShop Pro - Docker Compose
-# Usage: docker compose up -d
+# PhoneShop Pro - Docker Compose (SQLite, zero-setup)
+# Usage: docker compose up -d --build
+# App: http://localhost:3000
 # ============================================================
 
 services:
@@ -8,61 +9,24 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      args:
-        - DATABASE_URL=postgresql://phoneshop:phoneshop_password@db:5432/phoneshop_pro
     ports:
       - "3000:3000"
     environment:
-      - DATABASE_URL=postgresql://phoneshop:phoneshop_password@db:5432/phoneshop_pro
+      - DATABASE_URL=file:/app/data/prod.db
       - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:-phoneshop-pro-change-in-production}
+      - NEXTAUTH_URL=${NEXTAUTH_URL:-http://localhost:3000}
       - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
       - NEXT_PUBLIC_APP_NAME=PhoneShop Pro
       - NEXT_PUBLIC_DEFAULT_LANGUAGE=ar
-    depends_on:
-      db:
-        condition: service_healthy
     volumes:
       - app-data:/app/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/auth/session"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
       interval: 30s
       timeout: 5s
       retries: 3
       start_period: 15s
 
-  db:
-    image: postgres:16-alpine
-    environment:
-      - POSTGRES_USER=phoneshop
-      - POSTGRES_PASSWORD=phoneshop_password
-      - POSTGRES_DB=phoneshop_pro
-    volumes:
-      - db-data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U phoneshop"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-    restart: unless-stopped
-
-  # Optional: Redis for rate limiting & caching (uncomment to enable)
-  # redis:
-  #   image: redis:7-alpine
-  #   ports:
-  #     - "6379:6379"
-  #   volumes:
-  #     - redis-data:/data
-  #   healthcheck:
-  #     test: ["CMD", "redis-cli", "ping"]
-  #     interval: 5s
-  #     timeout: 3s
-  #     retries: 5
-  #   restart: unless-stopped
-
 volumes:
   app-data:
-  db-data:
-  # redis-data:

@@ -1,0 +1,33 @@
+# ============================================================
+# PhoneShop Pro - Render Blueprint (one-click deploy)
+# New → Blueprint → connect this repo. Render builds the Dockerfile,
+# attaches a persistent disk for SQLite, and runs the app.
+# See DEPLOY.md for the 5-minute guide.
+# ============================================================
+
+services:
+  - type: web
+    name: phoneshop-pro
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: starter # persistent disks require a paid plan
+    healthCheckPath: /api/health
+    disk:
+      name: phoneshop-data
+      mountPath: /app/data
+      sizeGB: 1
+    envVars:
+      - key: DATABASE_URL
+        value: file:/app/data/prod.db
+      - key: NEXTAUTH_SECRET
+        generateValue: true
+      - key: NEXTAUTH_URL
+        value: https://phoneshop-pro.onrender.com # ← change if your service URL differs
+      - key: NEXT_PUBLIC_APP_URL
+        value: https://phoneshop-pro.onrender.com # ← change if your service URL differs
+      - key: NEXT_PUBLIC_DEFAULT_LANGUAGE
+        value: ar
+      - key: BOOTSTRAP_ADMIN_EMAIL
+        sync: false # prompted at deploy time (or set in dashboard)
+      - key: BOOTSTRAP_ADMIN_PASSWORD
+        sync: false # prompted at deploy time (or set in dashboard)

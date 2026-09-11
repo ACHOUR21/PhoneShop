@@ -1,0 +1,30 @@
+# PhoneShop Pro - CI: install, test, build
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci --no-audit --no-fund
+
+      - name: Seed smoke test (node:sqlite data layer)
+        run: |
+          rm -f dev.db*
+          DATABASE_URL="file:./dev.db" npx tsx prisma/seed.ts
+          rm -f dev.db*
+
+      - run: npm test -- --run
+
+      - run: npm run build
