@@ -1,0 +1,44 @@
+# Dependencies
+node_modules
+
+# Build outputs
+.next
+out
+
+# Development
+*.db
+db/
+
+# IDE
+.vscode
+.idea
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Testing
+coverage
+__tests__
+vitest.config.ts
+
+# Tool results
+tool-results/
+agent-ctx/
+
+# Download artifacts
+download/
+
+# Misc
+git
+.gitignore
+*.md
+Caddyfile
+mini-services/
+examples/
+scripts/
+tests/
+Dockerfile
+docker-compose.yml
+.dockerignore
